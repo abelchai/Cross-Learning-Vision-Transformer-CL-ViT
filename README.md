@@ -1,39 +1,53 @@
 # Beyond-supervision-Harnessing-self-supervised-learning-in-unseen-plant-disease-recognition
 
-## Introduction
-This is a pytorch implementation for CL-ViT and FF-ViT in [Beyond supervision: Harnessing self-supervised learning in unseen plant disease recognition](https://www.sciencedirect.com/science/article/pii/S0925231224013791)
+## Abstract
+[[Paper]](https://www.sciencedirect.com/science/article/pii/S0925231224013791)
 
-![Cl-ViT](Figure/CL-ViT.png)
-<p align="center">Proposed CL-ViT architecture.</p>
+Deep learning models have demonstrated great promise in plant disease identification. However, existing approaches often face challenges when dealing with unseen crop-disease pairs, limiting their practicality in real-world settings. This research addresses the gap between known and unknown (unseen) plant disease identification. Our study pioneers the exploration of the zero-shot setting within this domain, offering a new perspective to conceptualizing plant disease identification. Specifically, we introduce the novel Cross Learning Vision Transformer (CL-ViT) model, incorporating self-supervised learning, in contrast to the previous state-of-the-art, FF-ViT, which emphasizes conceptual feature disentanglement with a synthetic feature generation framework. Through comprehensive analyses, we demonstrate that our novel model outperforms state-of-the-art models in both accuracy performance and visualization analysis. This study establishes a new benchmark and marks a significant advancement in the field of plant disease identification, paving the way for more robust and efficient plant disease identification systems. The code will be made available upon publication.
 
+## Contribution
+1. We introduce a novel model called CL-ViT, featuring unique conceptual designs, setting a new benchmark in the field of unseen plant disease identification.
+2. We improved previous FF-ViT model from [Pairwise Feature Learning for Unseen Plant Disease Recognition](https://ieeexplore.ieee.org/abstract/document/10222401/).
+3. We demonstrate that the incorporation of a guided learning mechanism surpasses conventional approaches in the multi-plant disease identification benchmark. Furthermore, we show that the CL-ViT model, integrating a SSL approach, outperforms the FF-ViT model employing a purely supervisory learning scheme for unseen plant disease identification tasks.
+4. In our qualitative analyses, we illustrate that CL-ViT learns a feature space capable of discriminating between different classes while minimizing the domain gap between seen and unseen data. This underscores the superiority of CL-ViT in implementing a more effective guided learning mechanism.
 
-![FF-ViT](Figure/FF-ViT.png)
-<p align="center">Proposed FF-ViT architecture.</p>
+## Proposed model
+1.  Cross Learning Vision Transformer (CL-ViT) model [[code]](model/CL-ViT.py)
+    * Key feature: Incorporate self-supervised learning to supervised model using pre-text tasks.
+<p align="center">
+  <img src="Figure/CL-ViT.png" alt="CL-ViT" width="800">
+  <br>
+  <i>Proposed CL-ViT architecture.</i>
+</p>
 
-The contributions of this paper:
-1. We demonstrate that the incorporation of a guided learning mechanism surpasses conventional approaches in the multi-plant disease identification benchmark. Furthermore, we show that the CL-ViT model, integrating a SSL approach, outperforms the FF-ViT model employing a purely supervisory learning scheme for unseen plant disease identification tasks.
-2. In our qualitative analyses, we illustrate that CL-ViT learns a feature space capable of discriminating between different classes while minimizing the domain gap between seen and unseen data. This underscores the superiority of CL-ViT in implementing a more effective guided learning mechanism.
+2. Improved Feature Fusion Vision Transformer (FF-ViT) model [[code]](model/FF-ViT.py)
+    * Key feature: Generate embeddings of synthetic composition based on training data.
+<p align="center">
+  <img src="Figure/FF-ViT.png" alt="FF-ViT" width="800">
+  <br>
+  <i>Proposed FF-ViT architecture.</i>
+</p>
 
 ## Results
 ![Acc Results](Figure/results.png)
+
 ## Preparation
 
-* Dataset: [spMohanty Github](https://github.com/spMohanty/PlantVillage-Dataset/tree/master)  
-(You can group all images into single folder to directly use the csv file provided in this repo)
+* Dataset: PV dataset [[spMohanty Github]](https://github.com/spMohanty/PlantVillage-Dataset/tree/master)  
+(You can group all images into single folder to directly use the csv file provided in this repo if you downloaded the original dataset.)
 
-* download [ViT pretrained weight](https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_base_p16_224-80ecf9dd.pth) link (From [rwightman Github timm repo](https://github.com/huggingface/pytorch-image-models))
+* Pretrained weight: [[ViT pretrained weight]](https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_base_p16_224-80ecf9dd.pth) (From [[rwightman Github timm repo]](https://github.com/huggingface/pytorch-image-models))
+* 
 ## Implementations
-CL-ViT >> [code](model/CL-ViT.py)
+* CL-ViT model [[code]](model/CL-ViT.py)
+* FF-ViT [[code]](model/FF-ViT.py)
 
 Notes
-* The csv file (metadata of images) are [here](dataset/csv_CLViT/)
+* The csv file (metadata of images) for CL-ViT are [here](dataset/csv_CLViT/)
+* The csv file (metadata of images) for FF-ViT are [here](dataset/csv_FFViT/)
 
+    (path_list.csv to locate the csv.file for all crop and disease training classes)
 
-FF-ViT >> [code](model/FF-ViT.py)
-
-Notes
-* The csv file (metadata of images) are [here](dataset/csv_FFViT/)  
-(path_list.csv to locate the csv.file for all crop and disease training classes)
 ## See also
 1. [Pairwise Feature Learning for Unseen Plant Disease Recognition](https://ieeexplore.ieee.org/abstract/document/10222401/): The first implementation of FF-ViT model with moving weighted sum. The current work improved and evaluated the performance of FF-ViT model on larger-scale dataset.
 2. [Unveiling Robust Feature Spaces: Image vs. Embedding-Oriented Approaches for Plant Disease Identification](https://ieeexplore.ieee.org/abstract/document/10317550/): The analysis between image or embedding feature space for plant disease identifications.
