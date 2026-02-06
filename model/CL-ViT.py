@@ -13,19 +13,15 @@ import torch
 import timm
 from tqdm import tqdm
 import cv2
-import torchvision
 import torch.nn as nn
-import torch.optim as optim
-from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 from timm.models.vision_transformer import Block
 from timm.layers import trunc_normal_
 from functools import partial
-from albumentations import Normalize, Cutout, CoarseDropout, Resize, Compose, Crop, CenterCrop
+from albumentations import Normalize, CoarseDropout, Resize, Compose, Crop, CenterCrop
 from albumentations.pytorch import ToTensorV2
 import torchvision.transforms as transforms
-
 from itertools import repeat
 import collections.abc
 def _ntuple(n):
@@ -50,7 +46,7 @@ def flip_hor(x):
 
 # Custom dataset for testing images
 class CustomDatasetFromImagesForalbumentation(Dataset):
-    def __init__(self, csv_path, transforms):
+    def __init__(self, csv_path, transforms, data_path):
         """
         Args:
             csv_path (string): path to csv file
@@ -94,7 +90,7 @@ class CustomDatasetFromImagesForalbumentation(Dataset):
 
 # Custom dataset for training images
 class CustomDatasetForSLandSSL_SingleA(Dataset):
-    def __init__(self, csv_path, transforms1, transforms2):
+    def __init__(self, csv_path, transforms1, transforms2, data_path):
         """
         Args:
             csv_path (string): path to csv file
@@ -218,8 +214,8 @@ class CustomDatasetForSLandSSL_SingleA(Dataset):
                                     Crop(168,168,224,224), 
                                     ], p=1.)
         self.transformToTensor = Compose([
-                                    Resize(img_size, img_size),
-                                    CenterCrop(img_size, img_size, p=1.),
+                                    Resize(self.img_size, self.img_size),
+                                    CenterCrop(self.img_size, self.img_size, p=1.),
                                     ToTensorV2(p=1.0),
                                     ], p=1.)
         self.transformToPIL = transforms.ToPILImage()
@@ -385,7 +381,8 @@ class Model_SL_SSL(nn.Module):
     def __init__(self,model, num_plant, num_disease, num_rotation, num_crop, num_flip):
         super(Model_SL_SSL,self).__init__()
         self.model = model
-            
+        device = next(self.model.parameters()).device
+        
         self.dim = 768
         self.dim_a = 768      
         self.dim_r = 192      
@@ -779,477 +776,481 @@ class Model_SL_SSL(nn.Module):
         self.h3 = self.linearh3(self.h3[:, 0])
         self.h4 = self.linearh4(self.h4[:, 0])             
         return (self.h2, self.h3, self.h4)
-
-# Hyperparameters and variables
-num_plant = 14
-num_disease = 21
-num_epochs = 30
-batch_size = 1
-num_rotation = 4
-num_crop = 3
-num_flip = 3
-img_size = 224
-learning_rate_layer = 0.001
-momentum = 0.9
-weight_decay = 0.00001
-pretrained = True
-
-# Default data augmentation
-ori_train_transforms_2 = Compose([
-            Resize(img_size, img_size),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
-            CoarseDropout(p=0.5),
-            Cutout(p=0.5),
-        ], p=1.)
-
-ori_train_transforms_3 = Compose([
-            Resize(img_size, img_size),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
-            CoarseDropout(p=0.5),
-            Cutout(p=0.5),
-            ToTensorV2(p=1.0),
-        ], p=1.)
-
-ori_valid_transforms = Compose([
-            Resize(img_size, img_size),
-            CenterCrop(img_size, img_size, p=1.),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
-            ToTensorV2(p=1.0),
-        ], p=1.)
-
-# Data path for datasets and metadatas
-data_path = 'C:/Users/User/Desktop/Vision Transformer/plantvillage (mix)'
-Save_model_path = "C:/Users/User/Desktop/Vision Transformer/Pre-trained model/save model"
-train_csv_path = 'C:/Users/User/Desktop/Vision Transformer/csv file/TIP/PV train (disease separated) 2L 10x PBS.csv' #21
-test_csv_path1 = 'C:/Users/User/Desktop/Vision Transformer/csv file/TIP/PV test (disease separated) 2L.csv'
-test_csv_path2 = 'C:/Users/User/Desktop/Vision Transformer/csv file/TIP/PV pepper bacteria spot test 2L.csv'
-
-
-# Dataset declarations
-train_dataset = CustomDatasetForSLandSSL_SingleA(train_csv_path, transforms1 = ori_train_transforms_2, transforms2 = ori_train_transforms_3)
-test_dataset1 = CustomDatasetFromImagesForalbumentation(test_csv_path1, transforms = ori_valid_transforms)
-test_dataset2 = CustomDatasetFromImagesForalbumentation(test_csv_path2, transforms = ori_valid_transforms)
-
-# Dataset loader
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last = False)
-test_loader1 = DataLoader(test_dataset1, batch_size=batch_size, shuffle=False, drop_last = False)
-test_loader2 = DataLoader(test_dataset2, batch_size=batch_size, shuffle=False, drop_last = False)
-
-# ViT model from Timm with ImageNet pretrained weight
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print("device = ", device)
-model_name = "vit_base_patch16_224"
-model = timm.create_model(model_name, pretrained=False).to(device)
-
-
-model_sl_ss = Model_SL_SSL(model, num_plant, num_disease, num_rotation, num_crop, num_flip)
-model_sl_ss.to(device)
-# print(model_sl_ss)
-
-if pretrained:
-    print("Using Pre-Trained Model")
-    MODEL_PATH = "C:/Users/User/Desktop/Vision Transformer/Pre-trained model/saved model/Pre-trained (official)/trained/jx_vit_base_p16_224-80ecf9dd (rwightman, ImageNet21k+ImageNet2012).pth"
-    model_sl_ss.model.load_state_dict(torch.load(MODEL_PATH),strict=True)
-
-# Use this if for checkpoint or fine-tune for model
-# if pretrained:
-#     print("Using Pre-Trained SL+SSL model")
-#     MODEL_PATH = "Your path here"
-#     model_sl_ss.load_state_dict(torch.load(MODEL_PATH),strict=True)
-
-
-parameters = list(model_sl_ss.parameters())
-error = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(parameters, lr=learning_rate_layer, weight_decay = weight_decay, momentum = momentum)
-for g in optimizer.param_groups:
-    g['lr'] = learning_rate_layer
     
-# Use this if for checkpoint or fine-tune for optimizer
-# if pretrained:
-#     print("Using Pre-Trained optimizer")
-#     OPTIMIZER_PATH = "C:/Users/User/Desktop/Vision Transformer/Pre-trained model/load model/TIP v2/ablation/vit_base_patch16_224_4e_99.1973_98.8812_WeakAug_0.5SSL123_v8_B16_192__PV_TIP_WU-opt-S0-1.pth"
-#     optimizer.load_state_dict(torch.load(OPTIMIZER_PATH))
-
-
-# Training counter
-count = 0
-loss_counter = 0
-a1 = 0
-a_d = 0
-
-for epoch in range(num_epochs):
-    print(f"Start of Epoch {epoch+1} of {num_epochs}")
-    print('Current Learning rate: {0}'.format(optimizer.param_groups[0]['lr']))
+def main():
+    # Data path for datasets and metadatas
+    data_path = 'D:/DPD_dataset/PV/plantvillage_ori/plantvillage_(mix)'
+    Save_model_path = "./save model"
+    MODEL_PATH = "path to your pretrained weight in pth"
     
-    # Training counter for calculation or debug
-    total_train = 0
-    seen_count = 0
-    unseen_count = 0
-    correct_train_p = 0
-    correct_train_d = 0
-    ss1_correct_train = 0
-    ss2_correct_train = 0
-    ss3_correct_train = 0
-    ss1_p_correct_train = 0
-    ss2_p_correct_train = 0
-    ss3_p_correct_train = 0
-    ss1_d_correct_train = 0
-    ss2_d_correct_train = 0
-    ss3_d_correct_train = 0
-    total_ss1_loss = 0
-    total_ss2_loss = 0
-    total_ss3_loss = 0
-    total_ss1_p_loss = 0
-    total_ss2_p_loss = 0
-    total_ss3_p_loss = 0
-    total_ss1_d_loss = 0
-    total_ss2_d_loss = 0
-    total_ss3_d_loss = 0
-    total_slp_loss = 0
-    total_sld_loss = 0
-    total_com_loss = 0
-    total_l1_penalty = 0
-    model_sl_ss.train()
-
-    # alpha and beta for SL and SSL regulazation
-    a = 0.5
-    b = 1.0
-    # Batch size (using gradient accumulation method)
-    iter_batch = 32
+    train_csv_path = './csv_clvit/PV_train.csv'
+    test_csv_path1 = './csv_clvit/PV_seen_test.csv'
+    test_csv_path2 = './csv_clvit/PV_unseen_test.csv'
     
-    for batch_idx, (images, labels_p, labels_d, ss1_labels, ss2_labels, ss3_labels) in enumerate(tqdm(train_loader)):
-        images, labels_p, labels_d  = images.to(device), labels_p.to(device), labels_d.to(device)
-        ss1_labels = ss1_labels.to(device)
-        ss2_labels = ss2_labels.to(device)
-        ss3_labels = ss3_labels.to(device)
-
-        batch_com_loss = 0
+    os.makedirs(Save_model_path, exist_ok=True)
+    
+    # Hyperparameters and variables
+    num_plant = 14
+    num_disease = 21
+    num_epochs = 30
+    batch_size = 1
+    num_rotation = 4
+    num_crop = 3
+    num_flip = 3
+    img_size = 224
+    learning_rate_layer = 0.001
+    momentum = 0.9
+    weight_decay = 0.00001
+    pretrained = False
+    num_workers = 4
+    
+    # Default data augmentation
+    train_transforms_1 = Compose([
+                Resize(img_size, img_size),
+                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+                CoarseDropout(p=0.5),
+            ], p=1.)
+    
+    train_transforms_2 = Compose([
+                Resize(img_size, img_size),
+                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+                CoarseDropout(p=0.5),
+                ToTensorV2(p=1.0),
+            ], p=1.)
+    
+    test_transforms = Compose([
+                Resize(img_size, img_size),
+                CenterCrop(img_size, img_size, p=1.),
+                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+                ToTensorV2(p=1.0),
+            ], p=1.)
+    
+    
+    # Dataset declarations
+    train_dataset = CustomDatasetForSLandSSL_SingleA(train_csv_path, transforms1 = train_transforms_1, transforms2 = train_transforms_2, data_path = data_path)
+    test_dataset1 = CustomDatasetFromImagesForalbumentation(test_csv_path1, transforms = test_transforms, data_path = data_path)
+    test_dataset2 = CustomDatasetFromImagesForalbumentation(test_csv_path2, transforms = test_transforms, data_path = data_path)
+    
+    # Dataset loader
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True, drop_last = False)
+    test_loader1 = DataLoader(test_dataset1, batch_size=batch_size, num_workers=num_workers, shuffle=False, drop_last = False)
+    test_loader2 = DataLoader(test_dataset2, batch_size=batch_size, num_workers=num_workers, shuffle=False, drop_last = False)
+    
+    # ViT model from Timm with ImageNet pretrained weight
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print("device = ", device)
+    model_name = "vit_base_patch16_224"
+    model = timm.create_model(model_name, pretrained=False).to(device)
+    
+    
+    model_sl_ss = Model_SL_SSL(model, num_plant, num_disease, num_rotation, num_crop, num_flip)
+    model_sl_ss.to(device)
+    # print(model_sl_ss)
+    
+    if pretrained:
+        print("Using Pre-Trained Model")
+        model_sl_ss.model.load_state_dict(torch.load(MODEL_PATH),strict=True)
+    
+    # Use this if for checkpoint or fine-tune for model
+    # if pretrained:
+    #     print("Using Pre-Trained SL+SSL model")
+    #     MODEL_PATH = "Your path here"
+    #     model_sl_ss.load_state_dict(torch.load(MODEL_PATH),strict=True)
+    
+    
+    parameters = list(model_sl_ss.parameters())
+    error = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(parameters, lr=learning_rate_layer, weight_decay = weight_decay, momentum = momentum)
+    for g in optimizer.param_groups:
+        g['lr'] = learning_rate_layer
         
-        # To check the image is seen and unseen class
-        for x in range(len(labels_d)): 
-            if labels_d[x] <= (num_disease - 1):
+    # Use this if for checkpoint or fine-tune for optimizer
+    # if pretrained:
+    #     print("Using Pre-Trained optimizer")
+    #     OPTIMIZER_PATH = "C:/Users/User/Desktop/Vision Transformer/Pre-trained model/load model/TIP v2/ablation/vit_base_patch16_224_4e_99.1973_98.8812_WeakAug_0.5SSL123_v8_B16_192__PV_TIP_WU-opt-S0-1.pth"
+    #     optimizer.load_state_dict(torch.load(OPTIMIZER_PATH))
+    
+    
+    # Training counter
+    count = 0
+    loss_counter = 0
+    a1 = 0
+    a_d = 0
+    
+    for epoch in range(num_epochs):
+        print(f"Start of Epoch {epoch+1} of {num_epochs}")
+        print('Current Learning rate: {0}'.format(optimizer.param_groups[0]['lr']))
         
-                # Obtain the output for plant, disease and SSL predictions for seen images
-                sl_op, sl_od, ss1_op, ss2_op, ss3_op, ss1_od, ss2_od, ss3_od  = model_sl_ss.seen(images[x].unsqueeze(0))
-
-                # Calculation the CrossEntrophyLoss for plant, disease and SSL tasks
-                slp_l = error(sl_op, labels_p[x].unsqueeze(0))
-                sld_l = error(sl_od, labels_d[x].unsqueeze(0))
-                ss1_lp = error(ss1_op, ss1_labels[x].unsqueeze(0))
-                ss2_lp = error(ss2_op, ss2_labels[x].unsqueeze(0))
-                ss3_lp = error(ss3_op, ss3_labels[x].unsqueeze(0))
-                ss1_ld = error(ss1_od, ss1_labels[x].unsqueeze(0))
-                ss2_ld = error(ss2_od, ss2_labels[x].unsqueeze(0))
-                ss3_ld = error(ss3_od, ss3_labels[x].unsqueeze(0))
-                seen_count += 1
-
-                # Obtain the predicted label
-                h1p_predictions = torch.max(sl_op,1)[1].to(device) 
-                h1d_predictions = torch.max(sl_od,1)[1].to(device)                                
-                h2p_predictions = torch.max(ss1_op, 1)[1].to(device)
-                h3p_predictions = torch.max(ss2_op, 1)[1].to(device)
-                h4p_predictions = torch.max(ss3_op, 1)[1].to(device)
-                h2d_predictions = torch.max(ss1_od, 1)[1].to(device)
-                h3d_predictions = torch.max(ss2_od, 1)[1].to(device)
-                h4d_predictions = torch.max(ss3_od, 1)[1].to(device)
-                
-                # Calculate accuracy
-                correct_train_p += (h1p_predictions == labels_p[x].unsqueeze(0)).sum()
-                correct_train_d += (h1d_predictions == labels_d[x].unsqueeze(0)).sum()
-                ss1_p_correct_train += (h2p_predictions == ss1_labels[x].unsqueeze(0)).sum()
-                ss2_p_correct_train += (h3p_predictions == ss2_labels[x].unsqueeze(0)).sum()
-                ss3_p_correct_train += (h4p_predictions == ss3_labels[x].unsqueeze(0)).sum()
-                ss1_d_correct_train += (h2d_predictions == ss1_labels[x].unsqueeze(0)).sum()
-                ss2_d_correct_train += (h3d_predictions == ss2_labels[x].unsqueeze(0)).sum()
-                ss3_d_correct_train += (h4d_predictions == ss3_labels[x].unsqueeze(0)).sum()
-                
-                # Compute loss according to batch size
-                slp_l = slp_l / batch_size
-                sld_l = sld_l / batch_size
-                ss1_lp = ss1_lp / batch_size
-                ss2_lp = ss2_lp / batch_size
-                ss3_lp = ss3_lp / batch_size 
-                ss1_ld = ss1_ld / batch_size
-                ss2_ld = ss2_ld / batch_size
-                ss3_ld = ss3_ld / batch_size 
-                total_slp_loss += slp_l.item()
-                total_sld_loss += sld_l.item()
-                total_ss1_p_loss += ss1_lp.item()
-                total_ss2_p_loss += ss2_lp.item()
-                total_ss3_p_loss += ss3_lp.item()
-                total_ss1_d_loss += ss1_ld.item()
-                total_ss2_d_loss += ss2_ld.item()
-                total_ss3_d_loss += ss3_ld.item()
-                com_loss = a*(slp_l + sld_l) + (a)*(ss1_lp + ss2_lp + ss3_lp) + (a)*(ss1_ld + ss2_ld + ss3_ld)
-                batch_com_loss += com_loss
-                total_com_loss += com_loss.item()
-
-            else:
-                
-                # OBtain the SSL prediction for unseen images
-                ss1_o,  ss2_o, ss3_o = model_sl_ss.unseen(images[x].unsqueeze(0))
-
-                unseen_count += 1
-
-                # Calculation the CrossEntrophyLoss for SSL tasks
-                ss1_l = error(ss1_o, ss1_labels[x].unsqueeze(0))
-                ss2_l = error(ss2_o, ss2_labels[x].unsqueeze(0))
-                ss3_l = error(ss3_o, ss3_labels[x].unsqueeze(0))
-
-                # Obtain the predicted label
-                h2_predictions = torch.max(ss1_o, 1)[1].to(device)
-                h3_predictions = torch.max(ss2_o, 1)[1].to(device)
-                h4_predictions = torch.max(ss3_o, 1)[1].to(device)                
-
-                # Calculate accuracy
-                ss1_correct_train += (h2_predictions == ss1_labels[x].unsqueeze(0)).sum()
-                ss2_correct_train += (h3_predictions == ss2_labels[x].unsqueeze(0)).sum()
-                ss3_correct_train += (h4_predictions == ss3_labels[x].unsqueeze(0)).sum() 
-
-                # Compute loss according to batch size
-                ss1_l = ss1_l / batch_size
-                ss2_l = ss2_l / batch_size
-                ss3_l = ss3_l / batch_size               
-                total_ss1_loss += ss1_l.item()
-                total_ss2_loss += ss2_l.item()
-                total_ss3_loss += ss3_l.item()
-                com_loss = b*(ss1_l + ss2_l + ss3_l)
-                batch_com_loss += com_loss
-                total_com_loss += com_loss.item()
-
-        # Gradient calculation and model update
-        batch_com_loss = batch_com_loss / iter_batch       
-        batch_com_loss.backward()                        
-        total_train += len(labels_p)
-        if ((batch_idx + 1) % iter_batch == 0) or (batch_idx + 1 == len(train_loader)):
-            optimizer.step()
-            optimizer.zero_grad()
-        count += 1
-
-    # Total accuracy calculations
-    accuracy_train_p = correct_train_p * 100 / seen_count
-    accuracy_train_d = correct_train_d * 100 / seen_count
-    accuracy_ss1_p_train = (ss1_p_correct_train + ss1_correct_train) * 100 / total_train
-    accuracy_ss2_p_train = (ss2_p_correct_train + ss2_correct_train) * 100 / total_train
-    accuracy_ss3_p_train = (ss3_p_correct_train + ss3_correct_train) * 100 / total_train
-    accuracy_ss1_d_train = (ss1_d_correct_train + ss1_correct_train) * 100 / total_train
-    accuracy_ss2_d_train = (ss2_d_correct_train + ss2_correct_train) * 100 / total_train
-    accuracy_ss3_d_train = (ss3_d_correct_train + ss3_correct_train) * 100 / total_train
+        # Training counter for calculation or debug
+        total_train = 0
+        seen_count = 0
+        unseen_count = 0
+        correct_train_p = 0
+        correct_train_d = 0
+        ss1_correct_train = 0
+        ss2_correct_train = 0
+        ss3_correct_train = 0
+        ss1_p_correct_train = 0
+        ss2_p_correct_train = 0
+        ss3_p_correct_train = 0
+        ss1_d_correct_train = 0
+        ss2_d_correct_train = 0
+        ss3_d_correct_train = 0
+        total_ss1_loss = 0
+        total_ss2_loss = 0
+        total_ss3_loss = 0
+        total_ss1_p_loss = 0
+        total_ss2_p_loss = 0
+        total_ss3_p_loss = 0
+        total_ss1_d_loss = 0
+        total_ss2_d_loss = 0
+        total_ss3_d_loss = 0
+        total_slp_loss = 0
+        total_sld_loss = 0
+        total_com_loss = 0
+        total_l1_penalty = 0
+        model_sl_ss.train()
     
-    print("")
-    print("Total unseen images: {0}".format(unseen_count))
-    print("")
-    print("SL training acc for Plant: {:.4f}".format(accuracy_train_p))
-    print("")
-    print("SL training acc for Disease: {:.4f}".format(accuracy_train_d))
-    print("")
-    print("SS1 P training acc: {:.4f}".format(accuracy_ss1_p_train))
-    print("")
-    print("SS2 P training acc: {:.4f}".format(accuracy_ss2_p_train))
-    print("")
-    print("SS3 P training acc: {:.4f}".format(accuracy_ss3_p_train))
-    print("")
-    print("SS1 D training acc: {:.4f}".format(accuracy_ss1_d_train))
-    print("")
-    print("SS2 D training acc: {:.4f}".format(accuracy_ss2_d_train))
-    print("")
-    print("SS3 D training acc: {:.4f}".format(accuracy_ss3_d_train))
-    print("")
-
-    # Total losses calcuations    
-    a_p = total_slp_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    a_d = total_sld_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    b = total_ss1_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    c = total_ss2_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    d = total_ss3_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    e = total_ss1_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    f1 = total_ss2_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    g = total_ss3_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    h = total_ss1_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    i = total_ss2_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    j = total_ss3_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
-    k = total_l1_penalty / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))    
-
-    print('SL loss for Plant: {0}'.format(a_p))
-    print('SL loss for Disease: {0}'.format(a_d))
-    print('SS1 loss: {0}'.format(b)) 
-    print('SS2 loss: {0}'.format(c))
-    print('SS3 loss: {0}'.format(d))
-    print('SS1 P loss: {0}'.format(e)) 
-    print('SS2 P loss: {0}'.format(f1))
-    print('SS3 P loss: {0}'.format(g))
-    print('SS1 D loss: {0}'.format(h)) 
-    print('SS2 D loss: {0}'.format(i))
-    print('SS3 D loss: {0}'.format(j))
-    print('Total SL+SSL loss: {0}'.format(a_p+a_d+b+c+d+e+f1+g+h+i+j))
-    print('L1 loss: {0}'.format(k))
-    print('Total Loss: {0}'.format(a_p+a_d+b+c+d+e+f1+g+h+i+j+k))
-    print(f"\nEpoch {epoch+1} of {num_epochs} Done!")
-    print('Current Learning rate: {0}'.format(optimizer.param_groups[0]['lr']))
-
-    # Seen test dataset evaluation
-    print(f"\nSeen Testing") 
-    model_sl_ss.eval()
-    total = 0
-    correct_p_o = 0
-    correct_p_t = 0
-    correct_d_o = 0
-    correct_d_t = 0
-    total_loss_p_loss = 0
-    total_loss_d_loss = 0
-    correct_test_o_combine = 0
-    correct_test_t_combine = 0
-    
-    for images, labels_p, labels_d in tqdm(test_loader1):
-        images, labels_p, labels_d = images.to(device), labels_p.to(device), labels_d.to(device)
-
-        # Plant and disease prediction
-        outputs_p, outputs_soft_p, outputs_t_soft_p = model_sl_ss.testp(images)
-        outputs_d, outputs_soft_d, outputs_t_soft_d = model_sl_ss.testd(images)
-
-        # Calculate loss for testing set
-        loss_p = error(outputs_p, labels_p)
-        loss_d = error(outputs_d, labels_d)
-        total_loss_p_loss += loss_p.item()
-        total_loss_d_loss += loss_d.item()
+        # alpha and beta for SL and SSL regulazation
+        a = 0.5
+        b = 1.0
+        # Batch size (using gradient accumulation method)
+        iter_batch = 32
         
-        # Obtain the predicted labels
-        h1_prediction_p_o = torch.max(outputs_soft_p,1)[1].to(device)
-        h1_prediction_p_t = torch.max(outputs_t_soft_p,1)[1].to(device)
-        h1_prediction_d_o = torch.max(outputs_soft_d,1)[1].to(device)
-        h1_prediction_d_t = torch.max(outputs_t_soft_d,1)[1].to(device)
- 
-        # Calculate accuracy
-        correct_p_o += (h1_prediction_p_o == labels_p).sum()
-        correct_p_t += (h1_prediction_p_t == labels_p).sum()
-        correct_d_o += (h1_prediction_d_o == labels_d).sum()
-        correct_d_t += (h1_prediction_d_t == labels_d).sum()
-
-        # Post-calculation for plant disease identification prediction
-        for x in range(len(labels_p)):
-            if (h1_prediction_p_o[x] == labels_p[x]):
-                if (h1_prediction_d_o[x] == labels_d[x]):
-                    correct_test_o_combine += 1 
-
-        for x in range(len(labels_p)):
-            if (h1_prediction_p_t[x] == labels_p[x]):
-                if (h1_prediction_d_t[x] == labels_d[x]):
-                    correct_test_t_combine += 1 
-
-        total += len(labels_p)
-
-    # Total accuracy and losses calculations
-    accuracy_p_o = correct_p_o * 100 / total
-    accuracy_p_t = correct_p_t * 100 / total
-    accuracy_d_o = correct_d_o * 100 / total
-    accuracy_d_t = correct_d_t * 100 / total
-    accuracy_o = correct_test_o_combine  * 100 / total
-    accuracy_t = correct_test_t_combine  * 100 / total
-    a_p = total_loss_p_loss / ((len(test_dataset1)//batch_size) + (len(test_dataset1) % batch_size > 0))
-    a_d = total_loss_d_loss / ((len(test_dataset1)//batch_size) + (len(test_dataset1) % batch_size > 0))
-
-    # NOTE 
-    # acc 1 is calculaed by softmax score of plant classifer only
-    # acc 2 is calculated based on summation of all softmax score from plant and SSL classifier
-    print("")
-    print('Total testing Loss: {0}'.format(a_p+a_d))    
-    print("")
-    print("Testing acc for seen Plant 1: {:.4f}".format(accuracy_p_o))
-    print("")
-    print("Testing acc for seen Disease 1: {:.4f}".format(accuracy_d_o))
-    print("")
-    print("Testing acc for seen Plant 2: {:.4f}".format(accuracy_p_t))
-    print("")
-    print("Testing acc for seen Disease 2: {:.4f}".format(accuracy_d_t))
-    print("")
-    print("Testing acc for total seen PD 1: {:.4f}".format(accuracy_o))
-    print("")
-    print("Testing acc for total seen PD 2: {:.4f}".format(accuracy_t))
-    print("")
-
-    # Unseen test dataset evaluation    
-    print(f"\nUnseen Testing")     
-    model_sl_ss.eval()
-    total = 0
-    correct_p_o = 0
-    correct_p_t = 0
-    correct_d_o = 0
-    correct_d_t = 0
-    count_unseen_p = 0
-    correct_test_o_combine = 0
-    correct_test_t_combine = 0
+        for batch_idx, (images, labels_p, labels_d, ss1_labels, ss2_labels, ss3_labels) in enumerate(tqdm(train_loader)):
+            images, labels_p, labels_d  = images.to(device), labels_p.to(device), labels_d.to(device)
+            ss1_labels = ss1_labels.to(device)
+            ss2_labels = ss2_labels.to(device)
+            ss3_labels = ss3_labels.to(device)
     
-    for images, labels_p, labels_d in tqdm(test_loader2):
-        images, labels_p, labels_d = images.to(device), labels_p.to(device), labels_d.to(device)
-
-        # Plant and disease prediction
-        outputs_p, outputs_soft_p, outputs_t_soft_p = model_sl_ss.testp(images)
-        outputs_d, outputs_soft_d, outputs_t_soft_d = model_sl_ss.testd(images)               
-
-        # Obtain the predicted labels            
-        h1_prediction_p_o = torch.max(outputs_soft_p,1)[1].to(device)
-        h1_prediction_p_t = torch.max(outputs_t_soft_p,1)[1].to(device)
-        h1_prediction_d_o = torch.max(outputs_soft_d,1)[1].to(device)
-        h1_prediction_d_t = torch.max(outputs_t_soft_d,1)[1].to(device)
-
-        # Calculate the accuracy        
-        correct_p_o += (h1_prediction_p_o == labels_p).sum()
-        correct_p_t += (h1_prediction_p_t == labels_p).sum()
-        correct_d_o += (h1_prediction_d_o == labels_d).sum()
-        correct_d_t += (h1_prediction_d_t == labels_d).sum()
-
-        # Post-calculation for plant disease identification prediction
-        for x in range(len(labels_p)):
-            if (h1_prediction_p_o[x] == labels_p[x]):
-                if (h1_prediction_d_o[x] == labels_d[x]):
-                    correct_test_o_combine += 1 
-
-        for x in range(len(labels_p)):
-            if (h1_prediction_p_t[x] == labels_p[x]):
-                if (h1_prediction_d_t[x] == labels_d[x]):
-                    correct_test_t_combine += 1 
+            batch_com_loss = 0
+            
+            # To check the image is seen and unseen class
+            for x in range(len(labels_d)): 
+                if labels_d[x] <= (num_disease - 1):
+            
+                    # Obtain the output for plant, disease and SSL predictions for seen images
+                    sl_op, sl_od, ss1_op, ss2_op, ss3_op, ss1_od, ss2_od, ss3_od  = model_sl_ss.seen(images[x].unsqueeze(0))
+    
+                    # Calculation the CrossEntrophyLoss for plant, disease and SSL tasks
+                    slp_l = error(sl_op, labels_p[x].unsqueeze(0))
+                    sld_l = error(sl_od, labels_d[x].unsqueeze(0))
+                    ss1_lp = error(ss1_op, ss1_labels[x].unsqueeze(0))
+                    ss2_lp = error(ss2_op, ss2_labels[x].unsqueeze(0))
+                    ss3_lp = error(ss3_op, ss3_labels[x].unsqueeze(0))
+                    ss1_ld = error(ss1_od, ss1_labels[x].unsqueeze(0))
+                    ss2_ld = error(ss2_od, ss2_labels[x].unsqueeze(0))
+                    ss3_ld = error(ss3_od, ss3_labels[x].unsqueeze(0))
+                    seen_count += 1
+    
+                    # Obtain the predicted label
+                    h1p_predictions = torch.max(sl_op,1)[1].to(device) 
+                    h1d_predictions = torch.max(sl_od,1)[1].to(device)                                
+                    h2p_predictions = torch.max(ss1_op, 1)[1].to(device)
+                    h3p_predictions = torch.max(ss2_op, 1)[1].to(device)
+                    h4p_predictions = torch.max(ss3_op, 1)[1].to(device)
+                    h2d_predictions = torch.max(ss1_od, 1)[1].to(device)
+                    h3d_predictions = torch.max(ss2_od, 1)[1].to(device)
+                    h4d_predictions = torch.max(ss3_od, 1)[1].to(device)
                     
-        total += len(labels_p)
-
-    # Total accuracy and losses calculations    
-    accuracy_p_o = correct_p_o * 100 / total
-    accuracy_p_t = correct_p_t * 100 / total
-    accuracy_d_o_1 = correct_d_o * 100 / total
-    accuracy_d_t_1 = correct_d_t * 100 / total
-    accuracy_o = correct_test_o_combine  * 100 / total
-    accuracy_t = correct_test_t_combine  * 100 / total
-
-    # NOTE 
-    # acc 1 is calculaed by softmax score of plant classifer only
-    # acc 2 is calculated based on summation of all softmax score from plant and SSL classifier
-    print("")    
-    print("Testing acc for PBS Plant 1: {:.4f}".format(accuracy_p_o))
-    print("")
-    print("Testing acc for PBS Disease 1: {:.4f}".format(accuracy_d_o_1))
-    print("")
-    print("Testing acc for PBS Plant 2: {:.4f}".format(accuracy_p_t))
-    print("")
-    print("Testing acc for PBS Disease 2: {:.4f}".format(accuracy_d_t_1))
-    print("")
-    print("Testing acc for total unseen PD 1: {:.4f}".format(accuracy_o))
-    print("")
-    print("Testing acc for total unseen PD 2: {:.4f}".format(accuracy_t))
-    print("")
+                    # Calculate accuracy
+                    correct_train_p += (h1p_predictions == labels_p[x].unsqueeze(0)).sum()
+                    correct_train_d += (h1d_predictions == labels_d[x].unsqueeze(0)).sum()
+                    ss1_p_correct_train += (h2p_predictions == ss1_labels[x].unsqueeze(0)).sum()
+                    ss2_p_correct_train += (h3p_predictions == ss2_labels[x].unsqueeze(0)).sum()
+                    ss3_p_correct_train += (h4p_predictions == ss3_labels[x].unsqueeze(0)).sum()
+                    ss1_d_correct_train += (h2d_predictions == ss1_labels[x].unsqueeze(0)).sum()
+                    ss2_d_correct_train += (h3d_predictions == ss2_labels[x].unsqueeze(0)).sum()
+                    ss3_d_correct_train += (h4d_predictions == ss3_labels[x].unsqueeze(0)).sum()
+                    
+                    # Compute loss according to batch size
+                    slp_l = slp_l / batch_size
+                    sld_l = sld_l / batch_size
+                    ss1_lp = ss1_lp / batch_size
+                    ss2_lp = ss2_lp / batch_size
+                    ss3_lp = ss3_lp / batch_size 
+                    ss1_ld = ss1_ld / batch_size
+                    ss2_ld = ss2_ld / batch_size
+                    ss3_ld = ss3_ld / batch_size 
+                    total_slp_loss += slp_l.item()
+                    total_sld_loss += sld_l.item()
+                    total_ss1_p_loss += ss1_lp.item()
+                    total_ss2_p_loss += ss2_lp.item()
+                    total_ss3_p_loss += ss3_lp.item()
+                    total_ss1_d_loss += ss1_ld.item()
+                    total_ss2_d_loss += ss2_ld.item()
+                    total_ss3_d_loss += ss3_ld.item()
+                    com_loss = a*(slp_l + sld_l) + (a)*(ss1_lp + ss2_lp + ss3_lp) + (a)*(ss1_ld + ss2_ld + ss3_ld)
+                    batch_com_loss += com_loss
+                    total_com_loss += com_loss.item()
     
-    # Model and optimizer saving
-    if ((epoch+1) % 1 == 0):
-        print("Saving Model")
-        torch.save(model_sl_ss.state_dict(), os.path.join(Save_model_path,'{}_{}e_{:.4f}_{:.4f}_model.pth'
-                                                                .format(model_name,epoch+1,accuracy_train_d,accuracy_d_o)))
-        print("Saving optimizer")
-        torch.save(optimizer.state_dict(), os.path.join(Save_model_path,'{}_{}e_{:.4f}_{:.4f}_opt.pth'
+                else:
+                    
+                    # OBtain the SSL prediction for unseen images
+                    ss1_o,  ss2_o, ss3_o = model_sl_ss.unseen(images[x].unsqueeze(0))
+    
+                    unseen_count += 1
+    
+                    # Calculation the CrossEntrophyLoss for SSL tasks
+                    ss1_l = error(ss1_o, ss1_labels[x].unsqueeze(0))
+                    ss2_l = error(ss2_o, ss2_labels[x].unsqueeze(0))
+                    ss3_l = error(ss3_o, ss3_labels[x].unsqueeze(0))
+    
+                    # Obtain the predicted label
+                    h2_predictions = torch.max(ss1_o, 1)[1].to(device)
+                    h3_predictions = torch.max(ss2_o, 1)[1].to(device)
+                    h4_predictions = torch.max(ss3_o, 1)[1].to(device)                
+    
+                    # Calculate accuracy
+                    ss1_correct_train += (h2_predictions == ss1_labels[x].unsqueeze(0)).sum()
+                    ss2_correct_train += (h3_predictions == ss2_labels[x].unsqueeze(0)).sum()
+                    ss3_correct_train += (h4_predictions == ss3_labels[x].unsqueeze(0)).sum() 
+    
+                    # Compute loss according to batch size
+                    ss1_l = ss1_l / batch_size
+                    ss2_l = ss2_l / batch_size
+                    ss3_l = ss3_l / batch_size               
+                    total_ss1_loss += ss1_l.item()
+                    total_ss2_loss += ss2_l.item()
+                    total_ss3_loss += ss3_l.item()
+                    com_loss = b*(ss1_l + ss2_l + ss3_l)
+                    batch_com_loss += com_loss
+                    total_com_loss += com_loss.item()
+    
+            # Gradient calculation and model update
+            batch_com_loss = batch_com_loss / iter_batch       
+            batch_com_loss.backward()                        
+            total_train += len(labels_p)
+            if ((batch_idx + 1) % iter_batch == 0) or (batch_idx + 1 == len(train_loader)):
+                optimizer.step()
+                optimizer.zero_grad()
+            count += 1
+    
+        # Total accuracy calculations
+        accuracy_train_p = correct_train_p * 100 / seen_count
+        accuracy_train_d = correct_train_d * 100 / seen_count
+        accuracy_ss1_p_train = (ss1_p_correct_train + ss1_correct_train) * 100 / total_train
+        accuracy_ss2_p_train = (ss2_p_correct_train + ss2_correct_train) * 100 / total_train
+        accuracy_ss3_p_train = (ss3_p_correct_train + ss3_correct_train) * 100 / total_train
+        accuracy_ss1_d_train = (ss1_d_correct_train + ss1_correct_train) * 100 / total_train
+        accuracy_ss2_d_train = (ss2_d_correct_train + ss2_correct_train) * 100 / total_train
+        accuracy_ss3_d_train = (ss3_d_correct_train + ss3_correct_train) * 100 / total_train
+        
+        print("")
+        print("Total unseen images: {0}".format(unseen_count))
+        print("")
+        print("SL training acc for Plant: {:.4f}".format(accuracy_train_p))
+        print("")
+        print("SL training acc for Disease: {:.4f}".format(accuracy_train_d))
+        print("")
+        print("SS1 P training acc: {:.4f}".format(accuracy_ss1_p_train))
+        print("")
+        print("SS2 P training acc: {:.4f}".format(accuracy_ss2_p_train))
+        print("")
+        print("SS3 P training acc: {:.4f}".format(accuracy_ss3_p_train))
+        print("")
+        print("SS1 D training acc: {:.4f}".format(accuracy_ss1_d_train))
+        print("")
+        print("SS2 D training acc: {:.4f}".format(accuracy_ss2_d_train))
+        print("")
+        print("SS3 D training acc: {:.4f}".format(accuracy_ss3_d_train))
+        print("")
+    
+        # Total losses calcuations    
+        a_p = total_slp_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        a_d = total_sld_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        b = total_ss1_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        c = total_ss2_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        d = total_ss3_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        e = total_ss1_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        f1 = total_ss2_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        g = total_ss3_p_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        h = total_ss1_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        i = total_ss2_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        j = total_ss3_d_loss / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))
+        k = total_l1_penalty / ((len(train_dataset)//batch_size) + (len(train_dataset) % batch_size > 0))    
+    
+        print('SL loss for Plant: {0}'.format(a_p))
+        print('SL loss for Disease: {0}'.format(a_d))
+        print('SS1 loss: {0}'.format(b)) 
+        print('SS2 loss: {0}'.format(c))
+        print('SS3 loss: {0}'.format(d))
+        print('SS1 P loss: {0}'.format(e)) 
+        print('SS2 P loss: {0}'.format(f1))
+        print('SS3 P loss: {0}'.format(g))
+        print('SS1 D loss: {0}'.format(h)) 
+        print('SS2 D loss: {0}'.format(i))
+        print('SS3 D loss: {0}'.format(j))
+        print('Total SL+SSL loss: {0}'.format(a_p+a_d+b+c+d+e+f1+g+h+i+j))
+        print('L1 loss: {0}'.format(k))
+        print('Total Loss: {0}'.format(a_p+a_d+b+c+d+e+f1+g+h+i+j+k))
+        print(f"\nEpoch {epoch+1} of {num_epochs} Done!")
+        print('Current Learning rate: {0}'.format(optimizer.param_groups[0]['lr']))
+    
+        # Seen test dataset evaluation
+        print(f"\nSeen Testing") 
+        model_sl_ss.eval()
+        total = 0
+        correct_p_o = 0
+        correct_p_t = 0
+        correct_d_o = 0
+        correct_d_t = 0
+        total_loss_p_loss = 0
+        total_loss_d_loss = 0
+        correct_test_o_combine = 0
+        correct_test_t_combine = 0
+        
+        for images, labels_p, labels_d in tqdm(test_loader1):
+            images, labels_p, labels_d = images.to(device), labels_p.to(device), labels_d.to(device)
+    
+            # Plant and disease prediction
+            outputs_p, outputs_soft_p, outputs_t_soft_p = model_sl_ss.testp(images)
+            outputs_d, outputs_soft_d, outputs_t_soft_d = model_sl_ss.testd(images)
+    
+            # Calculate loss for testing set
+            loss_p = error(outputs_p, labels_p)
+            loss_d = error(outputs_d, labels_d)
+            total_loss_p_loss += loss_p.item()
+            total_loss_d_loss += loss_d.item()
+            
+            # Obtain the predicted labels
+            h1_prediction_p_o = torch.max(outputs_soft_p,1)[1].to(device)
+            h1_prediction_p_t = torch.max(outputs_t_soft_p,1)[1].to(device)
+            h1_prediction_d_o = torch.max(outputs_soft_d,1)[1].to(device)
+            h1_prediction_d_t = torch.max(outputs_t_soft_d,1)[1].to(device)
+     
+            # Calculate accuracy
+            correct_p_o += (h1_prediction_p_o == labels_p).sum()
+            correct_p_t += (h1_prediction_p_t == labels_p).sum()
+            correct_d_o += (h1_prediction_d_o == labels_d).sum()
+            correct_d_t += (h1_prediction_d_t == labels_d).sum()
+    
+            # Post-calculation for plant disease identification prediction
+            for x in range(len(labels_p)):
+                if (h1_prediction_p_o[x] == labels_p[x]):
+                    if (h1_prediction_d_o[x] == labels_d[x]):
+                        correct_test_o_combine += 1 
+    
+            for x in range(len(labels_p)):
+                if (h1_prediction_p_t[x] == labels_p[x]):
+                    if (h1_prediction_d_t[x] == labels_d[x]):
+                        correct_test_t_combine += 1 
+    
+            total += len(labels_p)
+    
+        # Total accuracy and losses calculations
+        accuracy_p_o = correct_p_o * 100 / total
+        accuracy_p_t = correct_p_t * 100 / total
+        accuracy_d_o = correct_d_o * 100 / total
+        accuracy_d_t = correct_d_t * 100 / total
+        accuracy_o = correct_test_o_combine  * 100 / total
+        accuracy_t = correct_test_t_combine  * 100 / total
+        a_p = total_loss_p_loss / ((len(test_dataset1)//batch_size) + (len(test_dataset1) % batch_size > 0))
+        a_d = total_loss_d_loss / ((len(test_dataset1)//batch_size) + (len(test_dataset1) % batch_size > 0))
+    
+        # NOTE 
+        # acc 1 is calculaed by softmax score of plant classifer only
+        # acc 2 is calculated based on summation of all softmax score from plant and SSL classifier
+        print("")
+        print('Total testing Loss: {0}'.format(a_p+a_d))    
+        print("")
+        print("Testing acc for seen Plant 1: {:.4f}".format(accuracy_p_o))
+        print("")
+        print("Testing acc for seen Disease 1: {:.4f}".format(accuracy_d_o))
+        print("")
+        print("Testing acc for seen Plant 2: {:.4f}".format(accuracy_p_t))
+        print("")
+        print("Testing acc for seen Disease 2: {:.4f}".format(accuracy_d_t))
+        print("")
+        print("Testing acc for total seen PD 1: {:.4f}".format(accuracy_o))
+        print("")
+        print("Testing acc for total seen PD 2: {:.4f}".format(accuracy_t))
+        print("")
+    
+        # Unseen test dataset evaluation    
+        print(f"\nUnseen Testing")     
+        model_sl_ss.eval()
+        total = 0
+        correct_p_o = 0
+        correct_p_t = 0
+        correct_d_o = 0
+        correct_d_t = 0
+        count_unseen_p = 0
+        correct_test_o_combine = 0
+        correct_test_t_combine = 0
+        
+        for images, labels_p, labels_d in tqdm(test_loader2):
+            images, labels_p, labels_d = images.to(device), labels_p.to(device), labels_d.to(device)
+    
+            # Plant and disease prediction
+            outputs_p, outputs_soft_p, outputs_t_soft_p = model_sl_ss.testp(images)
+            outputs_d, outputs_soft_d, outputs_t_soft_d = model_sl_ss.testd(images)               
+    
+            # Obtain the predicted labels            
+            h1_prediction_p_o = torch.max(outputs_soft_p,1)[1].to(device)
+            h1_prediction_p_t = torch.max(outputs_t_soft_p,1)[1].to(device)
+            h1_prediction_d_o = torch.max(outputs_soft_d,1)[1].to(device)
+            h1_prediction_d_t = torch.max(outputs_t_soft_d,1)[1].to(device)
+    
+            # Calculate the accuracy        
+            correct_p_o += (h1_prediction_p_o == labels_p).sum()
+            correct_p_t += (h1_prediction_p_t == labels_p).sum()
+            correct_d_o += (h1_prediction_d_o == labels_d).sum()
+            correct_d_t += (h1_prediction_d_t == labels_d).sum()
+    
+            # Post-calculation for plant disease identification prediction
+            for x in range(len(labels_p)):
+                if (h1_prediction_p_o[x] == labels_p[x]):
+                    if (h1_prediction_d_o[x] == labels_d[x]):
+                        correct_test_o_combine += 1 
+    
+            for x in range(len(labels_p)):
+                if (h1_prediction_p_t[x] == labels_p[x]):
+                    if (h1_prediction_d_t[x] == labels_d[x]):
+                        correct_test_t_combine += 1 
+                        
+            total += len(labels_p)
+    
+        # Total accuracy and losses calculations    
+        accuracy_p_o = correct_p_o * 100 / total
+        accuracy_p_t = correct_p_t * 100 / total
+        accuracy_d_o_1 = correct_d_o * 100 / total
+        accuracy_d_t_1 = correct_d_t * 100 / total
+        accuracy_o = correct_test_o_combine  * 100 / total
+        accuracy_t = correct_test_t_combine  * 100 / total
+    
+        # NOTE 
+        # acc 1 is calculaed by softmax score of plant classifer only
+        # acc 2 is calculated based on summation of all softmax score from plant and SSL classifier
+        print("")    
+        print("Testing acc for PBS Plant 1: {:.4f}".format(accuracy_p_o))
+        print("")
+        print("Testing acc for PBS Disease 1: {:.4f}".format(accuracy_d_o_1))
+        print("")
+        print("Testing acc for PBS Plant 2: {:.4f}".format(accuracy_p_t))
+        print("")
+        print("Testing acc for PBS Disease 2: {:.4f}".format(accuracy_d_t_1))
+        print("")
+        print("Testing acc for total unseen PD 1: {:.4f}".format(accuracy_o))
+        print("")
+        print("Testing acc for total unseen PD 2: {:.4f}".format(accuracy_t))
+        print("")
+        
+        # Model and optimizer saving
+        if ((epoch+1) % 1 == 0):
+            print("Saving Model")
+            torch.save(model_sl_ss.state_dict(), os.path.join(Save_model_path,'{}_{}e_{:.4f}_{:.4f}_clvit_model.pth'
                                                                     .format(model_name,epoch+1,accuracy_train_d,accuracy_d_o)))
-        print("Saving done")
+            print("Saving optimizer")
+            torch.save(optimizer.state_dict(), os.path.join(Save_model_path,'{}_{}e_{:.4f}_{:.4f}_clvit_opt.pth'
+                                                                        .format(model_name,epoch+1,accuracy_train_d,accuracy_d_o)))
+            print("Saving done")
+    
+    
+    print("Training done")    
 
-
-print("Training done")    
-
-
+if __name__ == "__main__":
+    main()
 
 
 
