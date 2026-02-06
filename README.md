@@ -37,7 +37,7 @@ Deep learning models have demonstrated great promise in plant disease identifica
 (You can group all images into single folder to directly use the csv file provided in this repo if you downloaded the original dataset.)
 
 * Pretrained weight: [[ViT pretrained weight]](https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-vitjx/jx_vit_base_p16_224-80ecf9dd.pth) (From [[rwightman Github timm repo]](https://github.com/huggingface/pytorch-image-models))
-* 
+
 ## Implementations
 * CL-ViT model [[code]](model/CL-ViT.py)
 * FF-ViT [[code]](model/FF-ViT.py)
@@ -45,8 +45,6 @@ Deep learning models have demonstrated great promise in plant disease identifica
 Notes
 * The csv file (metadata of images) for CL-ViT are [here](dataset/csv_CLViT/)
 * The csv file (metadata of images) for FF-ViT are [here](dataset/csv_FFViT/)
-
-    (path_list.csv to locate the csv.file for all crop and disease training classes)
 
 ## See also
 1. [Pairwise Feature Learning for Unseen Plant Disease Recognition](https://ieeexplore.ieee.org/abstract/document/10222401/): The first implementation of FF-ViT model with moving weighted sum. The current work improved and evaluated the performance of FF-ViT model on larger-scale dataset.
