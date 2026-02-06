@@ -50,15 +50,16 @@ Notes
 1. [Pairwise Feature Learning for Unseen Plant Disease Recognition](https://ieeexplore.ieee.org/abstract/document/10222401/): The first implementation of FF-ViT model with moving weighted sum. The current work improved and evaluated the performance of FF-ViT model on larger-scale dataset.
 2. [Unveiling Robust Feature Spaces: Image vs. Embedding-Oriented Approaches for Plant Disease Identification](https://ieeexplore.ieee.org/abstract/document/10317550/): The analysis between image or embedding feature space for plant disease identifications.
 
-## Dependencies
-Pandas == 1.4.1  
-Numpy == 1.22.2  
-torch == 1.10.2  
-timm == 0.5.4  
-tqdm == 4.62.3  
-torchvision == 0.11.3  
-albumentations == 1.1.0  
-
+## Virtual environment dependencies
+Python 3.12.9
+```
+python -m venv py
+cd .\py\Scripts
+activate
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+pip install -r requirements_ffvit.txt
+pip install -r requirements_clvit.txt
+```
 ## License
 
 Creative Commons Attribution-Noncommercial-NoDerivative Works 4.0 International License (“the [CC BY-NC-ND License](https://creativecommons.org/licenses/by-nc-nd/4.0/)”)
