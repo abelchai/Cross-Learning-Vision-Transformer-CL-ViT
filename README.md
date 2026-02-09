@@ -1,3 +1,13 @@
+## Table of Contents
+- [Abstract](#abstract)
+- [Contribution](#contribution)
+- [Proposed Model](#proposed-model)
+- [Results](#result)
+- [Preparation](#dataset-and-pretrained-weight)
+- [Implementation](#implementations)
+- [License](#license)
+- [Citation](#citation)
+- 
 # Beyond-supervision-Harnessing-self-supervised-learning-in-unseen-plant-disease-recognition
 
 ## Abstract
@@ -31,7 +41,7 @@ Deep learning models have demonstrated great promise in plant disease identifica
 ## Results
 ![Acc Results](Figure/results.png)
 
-## Preparation
+## Dataset and pretrained weight
 
 * Dataset: PV dataset [[spMohanty Github]](https://github.com/spMohanty/PlantVillage-Dataset/tree/master)  
 (You can group all images into single folder to directly use the csv file provided in this repo if you downloaded the original dataset.)
