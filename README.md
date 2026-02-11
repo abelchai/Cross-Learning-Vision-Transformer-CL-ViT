@@ -2,7 +2,7 @@
 - [Abstract](#abstract)
 - [Contribution](#contribution)
 - [Proposed Model](#proposed-model)
-- [Results](#result)
+- [Results](#results)
 - [Preparation](#dataset-and-pretrained-weight)
 - [Implementation](#implementations)
 - [License](#license)
@@ -12,6 +12,8 @@
 # Beyond-supervision-Harnessing-self-supervised-learning-in-unseen-plant-disease-recognition
 
 ## Abstract
+This paper is accepted on Neurocomputing 2024 [[Link]](https://www.sciencedirect.com/journal/neurocomputing)
+
 [[Paper]](https://www.sciencedirect.com/science/article/pii/S0925231224013791)
 
 Deep learning models have demonstrated great promise in plant disease identification. However, existing approaches often face challenges when dealing with unseen crop-disease pairs, limiting their practicality in real-world settings. This research addresses the gap between known and unknown (unseen) plant disease identification. Our study pioneers the exploration of the zero-shot setting within this domain, offering a new perspective to conceptualizing plant disease identification. Specifically, we introduce the novel Cross Learning Vision Transformer (CL-ViT) model, incorporating self-supervised learning, in contrast to the previous state-of-the-art, FF-ViT, which emphasizes conceptual feature disentanglement with a synthetic feature generation framework. Through comprehensive analyses, we demonstrate that our novel model outperforms state-of-the-art models in both accuracy performance and visualization analysis. This study establishes a new benchmark and marks a significant advancement in the field of plant disease identification, paving the way for more robust and efficient plant disease identification systems. The code will be made available upon publication.
