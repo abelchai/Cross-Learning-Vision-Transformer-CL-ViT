@@ -45,8 +45,6 @@ Deep learning models have demonstrated great promise in plant disease identifica
 </p>
 
 ## Results
-![Acc Results](Figure/results.png)
-
 <p align="center">
   <img src="Figure/results.png" alt="results" width="800">
 </p>
